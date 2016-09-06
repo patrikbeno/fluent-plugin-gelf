@@ -9,6 +9,7 @@ class GELFOutput < BufferedOutput
   config_param :host, :string, :default => nil
   config_param :port, :integer, :default => 12201
   config_param :protocol, :string, :default => 'udp'
+  config_param :time_format, :string, :default => '%FT%T.%L%z'
 
   def initialize
     super
@@ -45,7 +46,8 @@ class GELFOutput < BufferedOutput
   end
 
   def format(tag, time, record)
-    gelfentry = { :timestamp => time, :_tag => tag }
+    # time parameter is in seconds, and all sub-second information is lost. Use value from original record
+    gelfentry = { :timestamp => DateTime.strptime(record['time'], @time_format).strftime('%s.%L'), :_tag => tag }
 
     record.each_pair do |k,v|
       case k
