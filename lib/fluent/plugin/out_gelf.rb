@@ -54,7 +54,7 @@ class GELFOutput < BufferedOutput
     gelfentry = { :_tag => tag }
 
     if @time_override
-      gelfentry[:timestamp] = DateTime.strptime(record[@time_key], @time_format)
+      gelfentry[:timestamp] = DateTime.strptime(record[@time_key], @time_format).strftime('%s.%L')
     end
 
     record.each_pair do |k,v|
