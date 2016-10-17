@@ -9,7 +9,11 @@ class GELFOutput < BufferedOutput
   config_param :host, :string, :default => nil
   config_param :port, :integer, :default => 12201
   config_param :protocol, :string, :default => 'udp'
-  config_param :time_format, :string, :default => '%FT%T.%L%z'
+
+  # timestamp handling; main reason for this is that fluentd time ignores/loses sub-second precision
+  config_param :time_override, :bool, :default => true
+  config_param :time_key, :string, :default => 'stime'
+  config_param :time_format, :string, :default => '%FT%T.%L%z' #ISO8601
 
   def initialize
     super
@@ -46,8 +50,12 @@ class GELFOutput < BufferedOutput
   end
 
   def format(tag, time, record)
-    # time parameter is in seconds, and all sub-second information is lost. Use value from original record
-    gelfentry = { :timestamp => DateTime.strptime(record['time'], @time_format).strftime('%s.%L'), :_tag => tag }
+
+    gelfentry = { :_tag => tag }
+
+    if @time_override
+      gelfentry[:timestamp] = DateTime.strptime(record[@time_key], @time_format)
+    end
 
     record.each_pair do |k,v|
       case k
@@ -71,13 +79,6 @@ class GELFOutput < BufferedOutput
         when '6', 'informational', 'info' then gelfentry[:level] = GELF::INFO
         when '7', 'debug' then gelfentry[:level] = GELF::DEBUG
         else gelfentry[:_level] = v
-        end
-      when 'msec' then
-        # msec must be three digits (leading/trailing zeroes)
-        if @add_msec_time then 
-          gelfentry[:timestamp] = "#{time.to_s}.#{v}".to_f
-        else
-          gelfentry[:_msec] = v
         end
       when 'short_message', 'full_message', 'facility', 'line', 'file' then
         gelfentry[k] = v
