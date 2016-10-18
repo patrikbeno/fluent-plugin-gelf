@@ -50,8 +50,13 @@ class GELFOutput < BufferedOutput
   end
 
   def format(tag, time, record)
+    if defined? Fluent::EventTime and time.is_a? Fluent::EventTime then
+      timestamp = time.sec + (time.nsec.to_f/1000000000).round(3)
+    else
+      timestamp = time
+    end
 
-    gelfentry = { :_tag => tag }
+    gelfentry = { :timestamp => timestamp, :_tag => tag }
 
     if @time_override
       gelfentry[:timestamp] = DateTime.strptime(record[@time_key], @time_format).strftime('%s.%L')
@@ -87,7 +92,7 @@ class GELFOutput < BufferedOutput
       end
     end
 
-    if !gelfentry.has_key?('short_message') then
+    if gelfentry['short_message'].to_s.empty? then
       gelfentry[:short_message] = record.to_json
     end
 
@@ -100,6 +105,9 @@ class GELFOutput < BufferedOutput
     end
   end
 
+  def formatted_to_msgpack_binary
+    true
+  end
 end
 
 
