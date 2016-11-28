@@ -13,9 +13,9 @@ class GELFOutput < BufferedOutput
   config_param :max_bytes, :integer, :default => 32000
 
   # timestamp handling; main reason for this is that fluentd time ignores/loses sub-second precision
-  config_param :time_override, :bool, :default => true
-  config_param :time_key, :string, :default => 'stime'
-  config_param :time_format, :string, :default => '%FT%T.%L%z' #ISO8601
+  config_param :xtime_override, :bool, :default => true
+  config_param :xtime_key, :string, :default => 'stime'
+  config_param :xtime_format, :string, :default => '%FT%T.%L%z' #ISO8601
 
   def initialize
     super
@@ -60,8 +60,8 @@ class GELFOutput < BufferedOutput
 
     gelfentry = { :timestamp => timestamp, :_tag => tag }
 
-    if @time_override
-      gelfentry[:timestamp] = DateTime.strptime(record[@time_key], @time_format).strftime('%s.%L')
+    if @xtime_override
+      gelfentry[:timestamp] = DateTime.strptime(record[@xtime_key], @xtime_format).strftime('%s.%L')
     end
 
     record.each_pair do |k,v|
