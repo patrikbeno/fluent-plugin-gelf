@@ -2,13 +2,15 @@ module Fluent
 
 class GELFOutput < BufferedOutput
 
-  Plugin.register_output("gelf", self)    
+  Plugin.register_output("gelf", self)
 
   config_param :use_record_host, :bool, :default => false
   config_param :add_msec_time, :bool, :default => false
   config_param :host, :string, :default => nil
   config_param :port, :integer, :default => 12201
   config_param :protocol, :string, :default => 'udp'
+  # Default max_bytes is set to avoid Elasticsearch indexing errors.
+  config_param :max_bytes, :integer, :default => 32000
 
   # timestamp handling; main reason for this is that fluentd time ignores/loses sub-second precision
   config_param :time_override, :bool, :default => true
@@ -63,6 +65,9 @@ class GELFOutput < BufferedOutput
     end
 
     record.each_pair do |k,v|
+      # Truncate values longer than configured maximum
+      v = v.bytesize > @max_bytes ? "#{v.byteslice(0, @max_bytes - 3)}..." : v
+
       case k
       when 'version' then
         gelfentry[:_version] = v
@@ -86,14 +91,26 @@ class GELFOutput < BufferedOutput
         else gelfentry[:_level] = v
         end
       when 'short_message', 'full_message', 'facility', 'line', 'file' then
-        gelfentry[k] = v
+        gelfentry[k.to_sym] = v
       else
-        gelfentry['_'+k] = v
+        gelfentry["_#{k}".to_sym] = v
       end
     end
 
-    if gelfentry['short_message'].to_s.empty? then
-      gelfentry[:short_message] = record.to_json
+    if !gelfentry.has_key?(:short_message) or gelfentry[:short_message].to_s.empty? then
+      # allow other non-empty fields to masquerade as the short_message if it is unset
+      if gelfentry.has_key?(:_message) and !gelfentry[:_message].to_s.empty? then
+        gelfentry[:short_message] = gelfentry.delete(:_message)
+      elsif gelfentry.has_key?(:_msg) and !gelfentry[:_msg].to_s.empty? then
+        gelfentry[:short_message] = gelfentry.delete(:_msg)
+      elsif gelfentry.has_key?(:_log) and !gelfentry[:_log].to_s.empty? then
+        gelfentry[:short_message] = gelfentry.delete(:_log)
+      elsif gelfentry.has_key?(:_record) and !gelfentry[:_record].to_s.empty? then
+        gelfentry[:short_message] = gelfentry.delete(:_record)
+      else
+        # we must have a short_message, so provide placeholder
+        gelfentry[:short_message] = '(no message)'
+      end
     end
 
     gelfentry.to_msgpack
