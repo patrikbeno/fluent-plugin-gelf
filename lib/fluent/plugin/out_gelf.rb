@@ -9,8 +9,6 @@ class GELFOutput < BufferedOutput
   config_param :host, :string, :default => nil
   config_param :port, :integer, :default => 12201
   config_param :protocol, :string, :default => 'udp'
-  # Default max_bytes is set to avoid Elasticsearch indexing errors.
-  config_param :max_bytes, :integer, :default => 32000
 
   # timestamp handling; main reason for this is that fluentd time ignores/loses sub-second precision
   config_param :xtime_override, :bool, :default => true
@@ -65,9 +63,6 @@ class GELFOutput < BufferedOutput
     end
 
     record.each_pair do |k,v|
-      # Truncate values longer than configured maximum
-      v = v.bytesize > @max_bytes ? "#{v.byteslice(0, @max_bytes - 3)}..." : v
-
       case k
       when 'version' then
         gelfentry[:_version] = v
