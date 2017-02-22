@@ -14,6 +14,7 @@ class GELFOutput < BufferedOutput
   config_param :xtime_override, :bool, :default => true
   config_param :xtime_key, :string, :default => 'stime'
   config_param :xtime_format, :string, :default => '%FT%T.%L%z' #ISO8601
+  config_param :xtime_add_timezone, :bool, :default => false
 
   def initialize
     super
@@ -59,7 +60,11 @@ class GELFOutput < BufferedOutput
     gelfentry = { :timestamp => timestamp, :_tag => tag }
 
     if @xtime_override
-      gelfentry[:timestamp] = DateTime.strptime(record[@xtime_key], @xtime_format).strftime('%s.%L')
+      if @xtime_add_timezone
+        gelfentry[:timestamp] = DateTime.strptime(record[@xtime_key]+Time.now.zone, @xtime_format+'%z').strftime('%s.%L')
+      else
+        gelfentry[:timestamp] = DateTime.strptime(record[@xtime_key], @xtime_format).strftime('%s.%L')
+      end
     end
 
     record.each_pair do |k,v|
